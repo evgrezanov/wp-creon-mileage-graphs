@@ -14,6 +14,7 @@ WP requires at least: 5.0
 Tested up to: 5.6
 Copyright: 2021
 */
+
 namespace CreonMG;
 
 // Exit if accessed directly
