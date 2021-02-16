@@ -42,7 +42,8 @@ class CreonMileageGraphs
 
     add_shortcode('team_result_dt', [__CLASS__, 'team_result_dt']);
 
-    add_action('save_post', [__CLASS__, 'save_post_mileage_callback'], 20, 3);
+    //add_action('save_post', [__CLASS__, 'save_post_mileage_callback'], 20, 3);
+    add_action('updated_post_meta', [__CLASS__, 'update_team_total_distance'], 10, 4);
   }
 
   public static function render_team_distance_by_user_id($atts)
@@ -345,6 +346,54 @@ class CreonMileageGraphs
     }
   }
 
+  public static function update_team_total_distance($meta_id, $post_id, $meta_key, $meta_value) {
+      $post_type = get_post_type($post_id);
+      // Stop if not the correct meta key
+      if ($meta_key != 'distance' && $post_type != 'mileage') {
+        return false;
+      }
+
+      $team_id = get_post_meta($post_id, 'team-id', true);
+      $total_distance = self::get_distance_by_team_id($team_id);
+      update_post_meta($team_id, 'total-distance', $total_distance);
+  }
+
 }
 
 CreonMileageGraphs::init();
+
+register_activation_hook(__FILE__, 'my_distance_calc_activation');
+function my_distance_calc_activation(){
+  wp_clear_scheduled_hook('my_hourly_distance_calc');
+
+  wp_schedule_event(time(), 'hourly', 'my_hourly_distance_calc');
+}
+
+add_action('my_hourly_distance_calc', 'do_this_hourly');
+function do_this_hourly(){
+    $args = array(
+      'post_type'       => 'team',
+      'post_status'     => 'publish',
+      'posts_per_page'  => -1,
+      'orderby'         => 'ID',
+      'order'           => 'ASC'
+    );
+    $teams = get_posts($args);
+
+    if (!empty($teams)):
+
+      foreach ($teams as $team):
+
+        $t_distance = CreonMileageGraphs::get_distance_by_team_id($team->ID);
+        update_post_meta($team->ID,'total-distance', $t_distance);
+        
+      endforeach;
+
+    endif;
+}
+
+// При деактивации плагина, обязательно нужно удалить задачу:
+register_deactivation_hook(__FILE__, 'my_deactivation');
+function my_deactivation(){
+  wp_clear_scheduled_hook('my_hourly_distance_calc');
+}
